@@ -56,7 +56,13 @@ def _proxy_test(args):
 
 
 class Evaluation(object):
-    def __init__(self, checkins, model=None, topN=5, users=None, _pool_num=6):
+    def __init__(self, 
+                checkins, 
+                model=None, 
+                topN=5, 
+                users=None, 
+                _pool_num=4, 
+                full=True):
         """
         Evaluate a model.Report precision and recall.
         checkins: test checkins, set `loader.load_checkins` method for more informations 
@@ -65,6 +71,7 @@ class Evaluation(object):
         users: users for test, should be iterated
         _pool_num: thread number to test, most cases default is ok.
                     if 0, then turn off multiple threads.
+        full: log hit record to screen and file, default True
         usage:
         >>> cks = {0: [1], 1:[0, 1], 2:[1,2]}
         >>> class M(object):
@@ -95,14 +102,18 @@ class Evaluation(object):
         result = self.model.recommend(user, self.topN)
         return list(set(pois) & set(result))
 
-    def assess(self, model=None, topN=5, users=None, full=True):
+    def assess(self, model=None, topN=None, users=None, full=None):
         if model is not None:
             self.model = model
         if self.model is None:
             raise ValueError("model is None.")
-        self.topN = topN
+        if topN is not None:
+            self.topN = topN
         if users is not None:
             self.users = users
+        if full is not None:
+            self.full = full
+        
         t0 = time.time()
         def prepare():
             for user in self.users:

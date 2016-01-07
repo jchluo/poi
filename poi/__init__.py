@@ -13,10 +13,10 @@ __author__ = 'jchluo'
 
 # load data
 from .loader import load_checkins
-from .loader import tomatrix 
 from .loader import load_locations 
 # models
 from .wmf import WMF
+from .bpr import BPR
 #eval
 from .models import Evaluation
 

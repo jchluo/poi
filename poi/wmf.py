@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 class WMF(Recommender):
     def __init__(self, checkins, num_factors=10, num_iterations=30,
-                 reg_param=0.8):
+                 reg_param=0.1):
         super(WMF, self).__init__(checkins);
         self.num_factors = num_factors
         self.num_iterations = num_iterations
@@ -70,12 +70,3 @@ class WMF(Recommender):
 
         return solve_vecs
         
-    
-if __name__ == "__main__":
-    mtrain = load_matrix(Filename("foursquare").train)
-    mtest = load_matrix(Filename("foursquare").test)
-    mf = ImplicitMF(mtrain)
-    eva = Evaluation(mtest, mtrain)
-    def hook(model):
-        save_model(model, "./output/model_%i.pkl" % model.current)
-    mf.train(before=eva.test, after=hook)
