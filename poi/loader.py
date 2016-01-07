@@ -52,7 +52,7 @@ def load_checkins(infile, index=None):
         checkins[user].append((item, freq))
 
     t1 = time.time()
-    log.debug("load %i pairs, %i users, %i pois." % (count, len(users), len(items)))
+    log.debug("load %i checkins, %i users, %i pois." % (count, len(users), len(items)))
     log.debug('time %.4f seconds' % (t1 - t0))
     return checkins 
 
