@@ -145,6 +145,6 @@ class Evaluation(object):
         t1 = time.time()
         log.info("recall   : %.4f" % _recall)
         log.info("precision: %.4f" % prec)
-        log.debug('time %.4f seconds' % (t1 - t0))
+        log.info('time     :%.4f' % (t1 - t0))
         return (_recall, prec)
 

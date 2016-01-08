@@ -8,22 +8,29 @@ import numpy as np
 from .models import Recommender 
 from .utils import nonzero
 from .utils import randint
+from .utils import threads 
 
 __all__ = ["BPR"]
 
 log = logging.getLogger(__name__)
 
+
+def _proxy_samples(args):
+    model, size = args
+    return model.create_samples(size)
+
+
 class BPR(Recommender):
     def __init__(self, 
                  checkins, 
                  num_factors=10, 
-                 num_iterations=10000,
+                 num_iterations=100,
                  learn_rate=0.1,
                  decay_rate=0.999,
                  reg_user=0.02,
                  reg_item=0.02,
                  reg_bias=0.02,
-                 num_samples=None):
+                 size_batch=None):
         super(BPR, self).__init__(checkins);
         self.num_factors = num_factors
         self.num_iterations = num_iterations
@@ -33,67 +40,89 @@ class BPR(Recommender):
         self.reg_item = reg_item
         self.reg_bias = reg_bias
         self.current = 0 
-        if num_samples is None:
-            self.num_samples = int(math.sqrt(self.num_users) * 100);
+        self.num_batchs = 500 # decay learn rate how many times in a iteration
+        if size_batch is None:
+            self.size_batch = int(math.sqrt(self.num_users) * 100);
         else:
-            self.num_samples = num_samples
+            self.size_batch = size_batch 
             
-        print self.num_samples
         # INIT should be small float
         self.user_vectors = 0.1 * np.random.normal(
                             size=(self.num_users, self.num_factors))
         self.item_vectors = 0.1 * np.random.normal(
                             size=(self.num_items, self.num_factors))
 
-    def _create_samples(self):
-        for i in xrange(self.num_samples):
+        self._nonzero = {}
+        for i in xrange(self.num_users):
+            self._nonzero[i] = nonzero(self.matrix, i)
+
+    def create_samples(self, size):
+        samples = []
+        for i in xrange(size):
             locs = set()
             while len(locs) == 0:
                 rand_user = randint(self.num_users)
-                locs = nonzero(self.matrix, rand_user) 
+                locs = self._nonzero[rand_user]
 
             rand_item = randint(self.num_items)
             if rand_item in locs:
                 neg_item = randint(self.num_items)
                 while neg_item in locs:
                     neg_item = randint(self.num_items)
-                yield (rand_user, rand_item, neg_item) 
+                wrap = (rand_user, rand_item, neg_item) 
+                samples.append(wrap)
             else:
                 locs = list(locs)
                 pos_item = locs[randint(len(locs))]
-                yield (rand_user, pos_item, rand_item) 
+                wrap = (rand_user, pos_item, rand_item) 
+                samples.append(wrap)
+        return samples
 
     def train(self, before=None, after=None):
-        t0 = time.time()
         while self.current < self.num_iterations:
+            t0 = time.time()
             self.current += 1 
+
             if before is not None:
                 before(self)
-            # update learn rate
-            self.learn_rate *= self.decay_rate
-            
-            # sample
-            samples = self._create_samples() 
-            for user, pos, neg in samples: 
-                x = self.predict(user, pos) - self.predict(user, neg)
-                z = 1.0 / (1.0 + math.exp(x))
-                for f in xrange(self.num_factors):
-                    uuf = self.user_vectors[user][f]
-                    ipf = self.item_vectors[pos][f]
-                    inf = self.item_vectors[neg][f]
-                    self.user_vectors[user][f] += self.learn_rate * ((ipf - inf) * z - self.reg_user * uuf)
-                    self.item_vectors[pos][f] += self.learn_rate * (uuf * z - self.reg_item * ipf)
-                    self.item_vectors[neg][f] += self.learn_rate * (-uuf * z - self.reg_item * inf)
 
-            if self.current % 100 == 0:
-                t1 = time.time()
-                log.debug('iteration %i, time %.2f seconds' % (self.current, t1 - t0))
-            if self.current % 500 == 0:
-                if after is not None:
-                    after(self)
-                t1 = time.time()
-                log.debug('iteration %i finished in %.2f seconds' % (self.current, t1 - t0))
-                t0 = time.time()
+            # samples
+            samples = []
+
+            t3 = time.time()
+            # multiple threads
+            params = [(self, self.size_batch) for i in xrange(self.num_batchs)]
+            samples = threads(_proxy_samples, params)
+
+            t4 = time.time()
+            log.debug("sample %i, time %.2f" % (self.num_batchs * self.size_batch, (t4 - t3)))
+
+            # update a batch
+            for b in xrange(self.num_batchs):
+                # update learn rate
+                self.learn_rate *= self.decay_rate
+
+                # udpate 
+                for user, pos, neg in samples[b]: 
+                    x = self.predict(user, pos) - self.predict(user, neg)
+                    z = 1.0 / (1.0 + math.exp(x))
+                    uvec = self.user_vectors[user]
+                    ipvec = self.item_vectors[pos]
+                    invec = self.item_vectors[neg]
+
+                    self.user_vectors[user] += \
+                        self.learn_rate * ((ipvec - invec) * z - self.reg_user * uvec)
+                    self.item_vectors[pos] += \
+                        self.learn_rate * (uvec * z - self.reg_item * ipvec)
+                    self.item_vectors[neg] += \
+                            self.learn_rate * (-uvec * z - self.reg_item * invec)
+                
+            t5 = time.time()
+            log.debug('update, time %.2f' % (t5 - t4))
+            if after is not None:
+                after(self)
+            t1 = time.time()
+            log.debug('Iteration %i finished, time %.2f' % (self.current, t1 - t0))
 
     def predict(self, user, item):
         return self.user_vectors[user].T.dot(self.item_vectors[item])
