@@ -20,6 +20,9 @@ def load_checkins(infile, index=None):
         >>> s = StringIO.StringIO("0 1 2\\n0 2 3\\n2 2 4\\n")
         >>> print load_checkins(s, index=[0,1,2])
         {0: [(1, 2), (2, 3)], 2: [(2, 4)]}
+        >>> s = StringIO.StringIO("0 1 2\\n0 1 3\\n")
+        >>> print load_checkins(s, index=[0,1,2])
+        {0: [(1, 5)]}
     """
     if index is None:
         index = [0, 1]
@@ -28,9 +31,8 @@ def load_checkins(infile, index=None):
     count = 0
     users = set()
     items = set()
-    pairs  = set()
     
-    checkins = {}
+    counts = {}
     for line in infile:
         params = line.strip().split()
         user = int(params[index[0]])
@@ -40,17 +42,18 @@ def load_checkins(infile, index=None):
         else:
             freq = 1
 
-        if (user, item) in pairs:
-            continue
-        pairs.add((user, item))
-
         count += 1
         users.add(user)
         items.add(item)
-        if user not in checkins:
-            checkins[user] = []
-        checkins[user].append((item, freq))
+        if user not in counts:
+            counts[user] = {} 
+        counts[user][item] = counts[user].get(item, 0) + freq
 
+    checkins = {}
+    for user in counts:
+        checkins[user] = []
+        for item, freq in counts[user].items():
+            checkins[user].append((item, freq))
     t1 = time.time()
     log.debug("load %i checkins, %i users, %i pois." % (count, len(users), len(items)))
     log.debug('time %.4f seconds' % (t1 - t0))
