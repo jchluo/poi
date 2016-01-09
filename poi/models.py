@@ -6,6 +6,7 @@ from multiprocessing import Pool
 import numpy as np
 
 from .loader import tomatrix
+from .utils import nonzero
 
 log = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ class Recommender(object):
         scores.sort(key=lambda x: x[1], reverse=True)
 
         if self.matrix is not None and ruleout:
-            ruleouts = set(np.nonzero(self.matrix[user])[1])
+            ruleouts = set(nonzero(self.matrix, user))
         else:
             ruleouts = set()
 
@@ -96,7 +97,7 @@ class Evaluation(object):
             self.users = users
 
     def hits(self, user):
-        pois = set(np.nonzero(self.matrix[user])[1])
+        pois = set(nonzero(self.matrix, user))
         if len(pois) <= 0:
             return []
         result = self.model.recommend(user, self.topN)
@@ -133,7 +134,7 @@ class Evaluation(object):
         _recall = 0.0
         valid_num = 0
         for user, n in matchs:
-            pois = np.nonzero(self.matrix[user])[1]
+            pois = set(nonzero(self.matrix, user))
             if len(pois) > 0:
                 valid_num += 1
                 _recall += float(n) / len(pois)
