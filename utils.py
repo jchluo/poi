@@ -61,4 +61,3 @@ def setup_log(filename=None,screen=True):
         logging.getLogger('').addHandler(console)
     log.info("new session")
 
-    
