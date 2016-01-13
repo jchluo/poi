@@ -83,7 +83,6 @@ class Evaluation(object):
         >>> ev = Evaluation(cks, model=M(), users=[0, 1], _pool_num=0)
         >>> ev.assess()
         (0.5, 0.1)
-
         """
         self.matrix = tomatrix(checkins)
         self.topN = topN
@@ -91,6 +90,7 @@ class Evaluation(object):
         self._pool_num = _pool_num
         self.num_users = self.matrix.shape[0]
         self.num_items = self.matrix.shape[1]
+        self.full = full
         if users is None:
             self.users = xrange(self.num_users)
         else:
@@ -118,7 +118,7 @@ class Evaluation(object):
         t0 = time.time()
         def prepare():
             for user in self.users:
-                yield (self, user, full)
+                yield (self, user, self.full)
 
         if self._pool_num > 0:
             pool = Pool(self._pool_num)
@@ -146,6 +146,6 @@ class Evaluation(object):
         t1 = time.time()
         log.info("recall   : %.4f" % _recall)
         log.info("precision: %.4f" % prec)
-        log.info('time     :%.4f' % (t1 - t0))
+        log.info('time     : %.4f' % (t1 - t0))
         return (_recall, prec)
 

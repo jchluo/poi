@@ -45,7 +45,7 @@ def poi_locations(filename):
     return locations
 
 
-def setup_log(filename=None,screen=True):
+def setup_log(filename=None):
     #sformat = "%(asctime)s %(filename)s[line:%(lineno)d]"\
     #            " %(levelname)s %(message)s"
     sformat = "%(asctime)s %(filename)s %(levelname)s %(message)s"
@@ -54,10 +54,12 @@ def setup_log(filename=None,screen=True):
                         format=sformat,
                         filename=filename,
                         filemode="a")
-    if screen:
         console = logging.StreamHandler()
         console.setLevel(logging.DEBUG)
         console.setFormatter(logging.Formatter(sformat))
         logging.getLogger('').addHandler(console)
+    else:
+        logging.basicConfig(level=logging.DEBUG, format=sformat)
+
     log.info("new session")
 
