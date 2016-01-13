@@ -12,11 +12,11 @@ __version__ = '1.0.0'
 __author__ = 'jchluo'
 
 # load data
-from .loader import load_checkins
-from .loader import load_locations 
+from .loader import load_checkins, load_locations 
 # models
 from .wmf import WMF
 from .bpr import BPR
+from .userbase import UserBase
 #eval
 from .models import Evaluation
 
