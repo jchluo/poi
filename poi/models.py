@@ -2,11 +2,10 @@
 
 import time
 import logging
-from multiprocessing import Pool 
 import numpy as np
 
-from .loader import tomatrix
-from .utils import nonzero
+from .loader import format_checkins
+from .utils import threads
 
 log = logging.getLogger(__name__)
 
@@ -16,9 +15,8 @@ class Recommender(object):
     def __init__(self, checkins):
         super(Recommender, self).__init__()
         self.checkins = checkins
-        self.matrix = tomatrix(checkins)
-        self.num_users = self.matrix.shape[0]
-        self.num_items = self.matrix.shape[1]
+        result = format_checkins(checkins) 
+        self.num_users, self.num_items, self.checkins = result 
 
     def train(self, before=None, after=None):
         raise NotImplementedError
@@ -32,8 +30,8 @@ class Recommender(object):
             scores.append((poi, self.predict(user, poi)))
         scores.sort(key=lambda x: x[1], reverse=True)
 
-        if self.matrix is not None and ruleout:
-            ruleouts = set(nonzero(self.matrix, user))
+        if user in self.checkins and ruleout:
+            ruleouts = set(self.checkins[user].keys())
         else:
             ruleouts = set()
 
@@ -84,12 +82,11 @@ class Evaluation(object):
         >>> ev.assess()
         (0.5, 0.1)
         """
-        self.matrix = tomatrix(checkins)
+        result = format_checkins(checkins) 
+        self.num_users, self.num_items, self.checkins = result 
         self.topN = topN
         self.model = model
         self._pool_num = _pool_num
-        self.num_users = self.matrix.shape[0]
-        self.num_items = self.matrix.shape[1]
         self.full = full
         if users is None:
             self.users = xrange(self.num_users)
@@ -97,7 +94,8 @@ class Evaluation(object):
             self.users = users
 
     def hits(self, user):
-        pois = set(nonzero(self.matrix, user))
+        if user in self.checkins:
+            pois = set(self.checkins[user].keys())
         if len(pois) <= 0:
             return []
         result = self.model.recommend(user, self.topN)
@@ -121,10 +119,7 @@ class Evaluation(object):
                 yield (self, user, self.full)
 
         if self._pool_num > 0:
-            pool = Pool(self._pool_num)
-            matchs = pool.map(_proxy_test, prepare()) 
-            pool.close()
-            pool.join()
+            matchs = threads(_proxy_test, prepare(), num=self._pool_num)
         else:
             matchs = []
             for arg in prepare():
@@ -134,7 +129,10 @@ class Evaluation(object):
         _recall = 0.0
         valid_num = 0
         for user, n in matchs:
-            pois = set(nonzero(self.matrix, user))
+            if user in self.checkins:
+                pois = set(self.checkins[user].keys())
+            else:
+                pois = []
             if len(pois) > 0:
                 valid_num += 1
                 _recall += float(n) / len(pois)
@@ -146,6 +144,6 @@ class Evaluation(object):
         t1 = time.time()
         log.info("recall   : %.4f" % _recall)
         log.info("precision: %.4f" % prec)
-        log.info('time     : %.4f' % (t1 - t0))
+        log.info('time     : %.4fs' % (t1 - t0))
         return (_recall, prec)
 

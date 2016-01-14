@@ -1,14 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import time
-import cPickle
 import logging
-import numpy as np
-import scipy.sparse as sparse
 
 log = logging.getLogger(__name__)
 
-__all__ = ["load_checkins", "tomatrix", "load_locations"]
+__all__ = ["load_checkins", "load_locations"]
 
 def load_checkins(infile, index=None, repeat=True):
     """Load checkins data from file.
@@ -66,46 +63,43 @@ def load_checkins(infile, index=None, repeat=True):
     return checkins 
 
 
-def tomatrix(checkins):
-    """Make checkins to a `sparse matrix` object.
+def format_checkins(checkins):
+    """Make checkins. 
     checkins: {uid: [(iid, freq), ...], ...} or {uid: [uid, ...], ...},
              see `load_checkins` for detail.
+    return: number of item, num of user, checkins in dict
     usage:
-     >>> import StringIO
-     >>> s = StringIO.StringIO("0 1 2\\n0 2 3\\n2 2 4\\n")
-     >>> cks = load_checkins(s, index=[0,1,2])
-     >>> m = tomatrix(cks)
-     >>> print ("%s" % m).replace("\\t", " ")
-       (0, 1) 2
-       (0, 2) 3
-       (2, 2) 4
+     >>> cks = {0: [1, 2], 1: [1]} 
+     >>> print format_checkins(cks) 
+     (2, 3, {0: {1: 1.0, 2: 1.0}, 1: {1: 1.0}})
     """
-    row = []
-    col = []
-    data = []
-
+    counts = {}
     users = set()
     items = set()
     
     for user in checkins:
+        users.add(user)
         feedbacks = checkins[user] 
+        counts[user] = {}
         for feed in feedbacks:
             if type(feed) == int:
                 item = feed
-                freq = 1
+                freq = 1.0
             else:
                 item = feed[0]
                 freq = feed[1]
-            row.append(user)
-            col.append(item)
-            data.append(freq)
 
             items.add(item)
+            counts[user][item] = float(freq)
         
-        users.add(user)
+    nuser = max(users) + 1
+    nitem = max(items) + 1 
+    # add empty {}
+    for user in xrange(nuser):
+        if user not in counts:
+            counts[user] = {} 
 
-    matrix = sparse.csr_matrix((data, (row, col)), shape=(max(users) + 1, max(items) + 1))
-    return matrix
+    return (nuser, nitem, counts)
 
 
 def load_locations(infile, index=None):
