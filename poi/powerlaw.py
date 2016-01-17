@@ -47,7 +47,26 @@ class PowerLaw(object):
         y = a * x ^ b
         x : distance, km
         """
+        if x == 0.0:
+            log.warn("Two locations distance is zero.")
+            return 1.0
         return self.a * np.power(x, self.b)
+
+    def predict(self, user, loc):
+        """Predict the probability about user will checkin in loc.
+        prob = Pr[l|Li] = IIPr[l, li] (li in Li)
+        see: Exploiting Geographical Influence for Collaborative 
+             Point-of-Interest Recommendation
+        """
+        y = 1.0
+        for en in self.checkins[user]:
+            if type(en) in [tuple, list]:
+                li = en[0]
+            else:
+                li = en
+            d = distance(self.locations[loc], self.locations[li]) / 1000.0
+            y *= self.prob(d)
+        return y
 
     def guass(self, max_x=None, min_x=0.0):
         """Run Least Square algorithm to guass the line.
