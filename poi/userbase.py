@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 import time
 import logging
 import math
@@ -17,7 +16,7 @@ def similarity(di, dj):
      >>> a = {0:2, 1:1, 2:1}
      >>> b = {0:1, 2:1}
      >>> print round(similarity(a, b), 5)
-     0.28868
+     0.86603
     """
     inds = set(di.keys()) & set(dj.keys()) 
     s = len(set(di.keys()) & set(dj.keys())) 
@@ -31,12 +30,68 @@ def similarity(di, dj):
     return float(up) / math.sqrt(m) * alpha 
 
 
+class SSMatrix(object):
+    """Symmetry Sparse Matrix.
+    usage:
+     >>> m = SSMatrix(3, 3)
+     >>> m[0, 0] = 1 
+     >>> m[0, 1] = 2
+     >>> print m[1, 0], m[0, 0], m[1, 1]
+     2 1 0.0
+     >>> print m.items(1)
+     [(0, 2), (1, 0.0), (2, 0.0)]
+    """
+    def __init__(self, num_row, num_col):
+        self._data = {}
+        self.num_row = num_row
+        self.num_col = num_col
+
+    def __getitem__(self, key):
+        row, col = key
+        if row in self._data:
+            if col in self._data[row]:
+                return self._data[row][col]
+
+        if col in self._data:
+            if row in self._data[col]:
+                return self._data[col][row]
+        return 0.0
+
+    def __setitem__(self, key, val):
+        if val == 0.0:
+            return None
+        row, col = key
+        if row >= self.num_row:
+            raise ValueError("out of row boundary.")
+        if col >= self.num_col:
+            raise ValueError("out of col boundary.")
+        if row not in self._data:
+            self._data[row] = {col : val}
+        else:
+            self._data[row][col] = val
+
+    def items(self, row):
+        l = []
+        for i in xrange(self.num_col):
+            l.append((i, self.__getitem__((row, i))))
+        return l
+
+
 class UserBase(Recommender):
+    """User base K nearest neighbors algorithm.
+       usage:
+        >>> cks = {0: [1,2,3], 1: [0, 1, 2], 2:[1, 2]}
+        >>> ub = UserBase(cks)
+        >>> ub.similarity()
+        >>> ub.neighbors(1)    # only concern 1 neighbors
+        >>> ub.recommend(0, 1) #recommend 1 item for user 0
+        [0]
+    """
     def __init__(self, checkins, num_neighbor=10):
         super(UserBase, self).__init__(checkins);
         self.num_neighbor = num_neighbor
         self._neighbors = None 
-        self.between = {} 
+        self.between = SSMatrix(self.num_items, self.num_items) 
 
     def __repr__(self):
         return "<UserBase [K=%i]>" % self.num_neighbor
@@ -44,16 +99,9 @@ class UserBase(Recommender):
     def similarity(self):
         t0 = time.time()
         for ui in xrange(self.num_users):
-            if ui not in self.between:
-                self.between[ui] = {} 
-            self.between[ui][ui] = 0.0 
             for uj in xrange(ui + 1, self.num_users):
-                if uj not in self.between:
-                    self.between[uj] = {} 
-
                 s = similarity(self.checkins[ui], self.checkins[uj])
-                self.between[uj][ui] = s
-                self.between[ui][uj] = s
+                self.between[ui, uj] = s
 
             if ui % 200 == 0:
                 t1 = time.time()
@@ -67,12 +115,11 @@ class UserBase(Recommender):
 
         self._neighbors = {}
         for u in xrange(self.num_users):
-            friends = self.between[u].items() 
+            friends = self.between.items(u) 
             friends.sort(key=lambda x: x[1], reverse=True)
             self._neighbors[u] = [f for f, s in friends[: self.num_neighbor]]
         t2  = time.time()
         log.debug("neighbors N: %i time: %.2fs" % (self.num_neighbor, t2 - t1))
-        return self._neighbors 
 
     def predict(self, user, item):
         if self._neighbors is None:
@@ -84,9 +131,9 @@ class UserBase(Recommender):
         s = 0.0
         w = 0.0
         for u in self._neighbors[user]:
-            w += self.between[user][u]
+            w += self.between[user, u]
             if item in self.checkins[u]:
-                s += self.between[user][u]
+                s += self.between[user, u]
         if w > 0.0:
             return s / w
         return 0.0
