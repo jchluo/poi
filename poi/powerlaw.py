@@ -39,6 +39,9 @@ class PowerLaw(object):
         self.b = 0.0
         self.line_ready = False
 
+    def __repr__(self):
+        return "<PowerLaw [a=%f, b=%f]>" % (self.a, self.b) 
+
     def prob(self, x):
         """Calculate the probability for x distance.
         y = a * x ^ b
