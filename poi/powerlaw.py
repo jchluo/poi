@@ -5,14 +5,24 @@ import math
 import logging
 
 import numpy as np
-from scipy.optimize import leastsq
-import matplotlib.pyplot as plt
+try:
+    import matplotlib.pyplot as plt
+    from scipy.optimize import leastsq
+except:
+    pass
 
 from .kde import distance
+from .models import Recommender
 
 log = logging.getLogger(__name__)
 
-class PowerLaw(object):
+def approximate_distance(point_i, point_j):
+    d = distance(point_i, point_j) / 1000.0
+    k = round(d, 1)
+    return k
+
+
+class PowerLaw(Recommender):
     """Power Law algorithm.
     usage:
      >>> cks = {1:[0, 1, 2, 3], 2:[0, 1, 2]}
@@ -29,15 +39,13 @@ class PowerLaw(object):
         checkins: see poi.load_checkins method
         locations: see poi.locations method.
         """
-        self.checkins = checkins
+        super(PowerLaw, self).__init__(checkins)
         self.locations = locations
-        self.num_loc = len(locations) 
-        self.arr_x = []
-        self.arr_y = []
         self.points = []
         self.a = 0.0
         self.b = 0.0
         self.line_ready = False
+        self._cache = {}
 
     def __repr__(self):
         return "<PowerLaw [a=%f, b=%f]>" % (self.a, self.b) 
@@ -48,9 +56,9 @@ class PowerLaw(object):
         x : distance, km
         """
         if x == 0.0:
-            log.warn("Two locations distance is zero.")
-            return 1.0
-        return self.a * np.power(x, self.b)
+            #log.warn("Two locations distance is zero.")
+            x = 10 ** (-10)
+        return self.a * (x ** self.b)
 
     def predict(self, user, loc):
         """Predict the probability about user will checkin in loc.
@@ -58,15 +66,29 @@ class PowerLaw(object):
         see: Exploiting Geographical Influence for Collaborative 
              Point-of-Interest Recommendation
         """
-        y = 1.0
-        for en in self.checkins[user]:
-            if type(en) in [tuple, list]:
-                li = en[0]
-            else:
-                li = en
-            d = distance(self.locations[loc], self.locations[li]) / 1000.0
-            y *= self.prob(d)
-        return y
+        if user in self._cache:
+            if loc not in self._cache[user]:
+                return 0.0
+            return self._cache[user][loc]
+
+        self._cache[user] = {}
+        max_y = -np.Infinity
+        for l in xrange(self.num_items):
+            if l in self.checkins[user]:
+                continue
+            y = 0.0 
+            for li in self.checkins[user]:
+                d = distance(self.locations[l], self.locations[li]) / 1000.0
+                y += np.log(self.prob(d))
+            if y > max_y:
+                max_y = y
+            self._cache[user][l] = y
+        for l, y in self._cache[user].items():
+            self._cache[user][l] = math.e ** (y - max_y)
+
+        if loc not in self._cache[user]:
+            return 0.0
+        return self._cache[user][loc]
 
     def guass(self, max_x=None, min_x=0.0):
         """Run Least Square algorithm to guass the line.
@@ -94,8 +116,8 @@ class PowerLaw(object):
                     _arr_y.append(arr_y[i])
         x = np.log(_arr_x)
         y = np.log(_arr_y) 
-        log.debug("least x: %s" % x)
-        log.debug("least y: %s" % y)
+        log.debug("least x: [%s, ...]" % str(x[: 4])[1: -1])
+        log.debug("least y: [%s, ...]" % str(y[: 4])[1: -1])
         result = leastsq(_error, [1, 1], args=(x, y))
         self.a = np.power(math.e, result[0][0])
         self.b = result[0][1]
@@ -108,47 +130,26 @@ class PowerLaw(object):
         """Count distance show up how many times in checkins.
         """
         data = {}
-        far = {}
-        for i in range(self.num_loc):
-            for j in range(i + 1, self.num_loc):
-                pi = self.locations[i]
-                pj = self.locations[j]
-                d = distance(pi, pj) / 1000
-                k = round(d, 1)
-                far[(i, j)] = k
-                data[k] = 0  
-        log.debug("distance cmp ok.")
-
         for u in self.checkins:
             locs = []
-            for en in self.checkins[u]:
-                if type(en) in [tuple, list]:
-                    locs.append(en[0])
-                else:
-                    locs.append(en)
+            for l, f in self.checkins[u].items():
+                locs.append(l)
             num = len(locs)
             for i in range(num):
                 for j in range(i + 1, num):
-                    li = locs[i]
-                    lj = locs[j]
-                    if (li, lj) not in far:
-                        li, lj = lj, li
-                    k = far[(li, lj)]
-                    data[k] += 1
-        log.debug("distance count ok.")
-
+                    pi = self.locations[locs[i]]
+                    pj = self.locations[locs[j]]
+                    k = approximate_distance(pi, pj) 
+                    data[k] = data.get(k, 0) + 1
         x = []
         y = []
         count = 0
         for k, c in data.items():
-            if c > 0:
-                x.append(k)
-                y.append(float(c))
-                count += c
+            x.append(k)
+            y.append(float(c))
+            count += c
         y = [c / count for c in y]
         arr_x = np.array(x)
-        # deal with 0, if x = 0, log(x) will cause an -infinity error.
-        #arr_x = np.where(arr_x == 0.0, 10 ** (-20), arr_x)
         arr_y = np.array(y)
         sort_index = np.argsort(arr_x)
         arr_x = arr_x[sort_index]
@@ -171,7 +172,7 @@ class PowerLaw(object):
 
         if filename is not None:
             plt.savefig(filename)
+            log.debug("plot %s ok." % filename)
         else:
             plt.show()
-        log.debug("plot ok.")
 
