@@ -5,9 +5,10 @@
 # usage: 
 #     sh kill-python.sh
 
-ps -elf | grep " python "|grep -v "grep"|while read l
+ps -elf | grep " python\|pypy"|grep -v "grep"|while read l
 do
     pid=`echo $l | cut -f 4 -d " "`
     kill -9  $pid
     echo $l
 done
+
