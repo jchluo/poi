@@ -88,10 +88,16 @@ class Evaluation(object):
         self.model = model
         self._pool_num = _pool_num
         self.full = full
+        self.precision = 0.0 
+        self.recall = 0.0 
         if users is None:
             self.users = xrange(self.num_users)
         else:
             self.users = users
+
+    def __repr__(self):
+        return "<Evaluation [topN=%i, precision=%.4f, recall=%.4f]>" %\
+                (self.topN, self.precision, self.recall)
 
     def hits(self, user):
         if user in self.checkins:
@@ -126,7 +132,7 @@ class Evaluation(object):
                 matchs.append(_proxy_test(arg))
         
         nhits = sum([n for u, n in matchs])
-        _recall = 0.0
+        reca = 0.0
         valid_num = 0
         for user, n in matchs:
             if user in self.checkins:
@@ -135,15 +141,19 @@ class Evaluation(object):
                 pois = []
             if len(pois) > 0:
                 valid_num += 1
-                _recall += float(n) / len(pois)
+                reca += float(n) / len(pois)
 
         if valid_num == 0:
             raise ValueError("Checkin matrix should not be empty.")
         prec = float(nhits) / (valid_num * self.topN)
-        _recall = float(_recall) / valid_num 
+        reca = float(reca) / valid_num 
         t1 = time.time()
-        log.info("recall   : %.4f" % _recall)
+        log.info("recall   : %.4f" % reca)
         log.info("precision: %.4f" % prec)
         log.info('time     : %.4fs' % (t1 - t0))
-        return (_recall, prec)
+
+        self.precision = prec
+        self.recall = reca
+
+        return (reca, prec)
 

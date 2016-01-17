@@ -26,7 +26,8 @@ def similarity(di, dj):
 
     up = sum([di[k] * dj[k] for k in inds]) 
     m = sum([di[k] ** 2 for k in di]) * sum([dj[k] ** 2 for k in dj]) 
-    alpha = min(s / 6.0, 1.0)
+    #alpha = min(s / 6.0, 1.0)
+    alpha = 1.0
     return float(up) / math.sqrt(m) * alpha 
 
 
@@ -36,6 +37,9 @@ class UserBase(Recommender):
         self.num_neighbor = num_neighbor
         self._neighbors = None 
         self.between = {} 
+
+    def __repr__(self):
+        return "<UserBase [K=%i]>" % self.num_neighbor
 
     def similarity(self):
         t0 = time.time()

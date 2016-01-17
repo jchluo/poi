@@ -17,6 +17,8 @@ from .loader import load_checkins, load_locations
 from .wmf import WMF
 from .bpr import BPR
 from .userbase import UserBase
+from .kde import distance 
+from .powerlaw import PowerLaw
 #eval
 from .models import Evaluation
 

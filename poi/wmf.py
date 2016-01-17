@@ -70,6 +70,9 @@ class WMF(Recommender):
         self.item_vectors = np.random.normal(size=(self.num_items,
                                                    self.num_factors))
 
+    def __repr__(self):
+        return "<WMF [factors=%i, reg=%.4f]>" % (self.num_factors, self.reg_param)
+
     def train(self, before=None, after=None):
         while self.current < self.num_iterations:
             self.current += 1 
