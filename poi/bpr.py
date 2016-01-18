@@ -6,14 +6,11 @@ import math
 
 import numpy as np
 from .models import Recommender 
-from .utils import nonzero
-from .utils import randint
-from .utils import threads 
+from .utils import randint, threads
 
 __all__ = ["BPR"]
 
 log = logging.getLogger(__name__)
-
 
 def _proxy_samples(args):
     model, size = args
@@ -24,7 +21,7 @@ class BPR(Recommender):
     def __init__(self, 
                  checkins, 
                  num_factors=10, 
-                 num_iterations=100,
+                 num_iters=15,
                  learn_rate=0.1,
                  decay_rate=0.999,
                  reg_user=0.02,
@@ -33,7 +30,7 @@ class BPR(Recommender):
                  size_batch=None):
         super(BPR, self).__init__(checkins);
         self.num_factors = num_factors
-        self.num_iterations = num_iterations
+        self.num_iters = num_iters
         self.learn_rate = learn_rate
         self.decay_rate = decay_rate
         self.reg_user = reg_user
@@ -52,9 +49,9 @@ class BPR(Recommender):
         self.item_vectors = 0.1 * np.random.normal(
                             size=(self.num_items, self.num_factors))
 
-        self._nonzero = {}
-        for i in xrange(self.num_users):
-            self._nonzero[i] = nonzero(self.matrix, i)
+    def __repr__(self):
+        return "<BPR [k=%i, learn=%.2f, reg_u=%.2f, reg_i=%.2f]>"\
+            (self.learn_rate, self.reg_user, self.reg_item)
 
     def create_samples(self, size):
         samples = []
@@ -62,7 +59,7 @@ class BPR(Recommender):
             locs = set()
             while len(locs) == 0:
                 rand_user = randint(self.num_users)
-                locs = self._nonzero[rand_user]
+                locs = self.checkins[rand_user].keys()
 
             rand_item = randint(self.num_items)
             if rand_item in locs:
@@ -79,20 +76,17 @@ class BPR(Recommender):
         return samples
 
     def train(self, before=None, after=None):
-        while self.current < self.num_iterations:
+        while self.current < self.num_iters:
             t0 = time.time()
             self.current += 1 
 
             if before is not None:
                 before(self)
 
-            # samples
-            samples = []
-
             t3 = time.time()
-            # multiple threads
-            params = [(self, self.size_batch) for i in xrange(self.num_batchs)]
-            samples = threads(_proxy_samples, params)
+            # samples
+            args = [(self, self.size_batch) for i in xrange(self.num_batchs)]
+            samples = threads(_proxy_samples, args)
 
             t4 = time.time()
             log.debug("sample %i, time %.2f" % (self.num_batchs * self.size_batch, (t4 - t3)))
@@ -101,8 +95,6 @@ class BPR(Recommender):
             for b in xrange(self.num_batchs):
                 # update learn rate
                 self.learn_rate *= self.decay_rate
-
-                # udpate 
                 for user, pos, neg in samples[b]: 
                     x = self.predict(user, pos) - self.predict(user, neg)
                     z = 1.0 / (1.0 + math.exp(x))

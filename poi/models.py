@@ -144,8 +144,8 @@ class Evaluation(object):
 
         if valid_num == 0:
             raise ValueError("Checkin matrix should not be empty.")
-        prec = float(nhits) / (valid_num * self.topN)
-        reca = float(reca) / valid_num 
+        prec = float(nhits) / (len(self.users) * self.topN)
+        reca = float(reca) / len(self.users) 
         t1 = time.time()
         log.info("recall   : %.4f" % reca)
         log.info("precision: %.4f" % prec)
@@ -157,7 +157,7 @@ class Evaluation(object):
         return (reca, prec)
 
 
-def assess(model, checkins, topN=None, users=None, full=None, num_pool=4):
+def assess(model, checkins, topN=None, users=None, full=None, num_pool=3):
     eva = Evaluation(checkins, model=model, _pool_num=num_pool)
     eva.assess(topN=topN, users=users, full=full)
     return eva

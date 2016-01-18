@@ -85,6 +85,7 @@ def dump(model, fp, num=100, attrs=None, _pool_num=4):
     if model is None:
         raise ValueError("model is None.") 
 
+    t0 = time.time()
     args = [(model, i, num) for i in xrange(model.num_users)]
     if _pool_num > 0:
         results = threads(_proxy_predict, args, _pool_num)
@@ -109,6 +110,9 @@ def dump(model, fp, num=100, attrs=None, _pool_num=4):
     # write recoreds
     for one in results: 
         print >> fp, json.dumps(one)
+
+    t1 = time.time()
+    log.debug("dump ok, time: %.2f" % (t1 - t0))
 
 
 def load(fp):
