@@ -3,57 +3,18 @@ import time
 import numpy as np
 import logging
 
-import scipy.sparse as sparse
-from scipy.sparse.linalg import spsolve
+try:
+    import scipy.sparse as sparse
+    from scipy.sparse.linalg import spsolve
+except:
+    pass
 
 from .models import Recommender 
+from .utils import tomatrix
 
 __all__ = ["WMF"]
 
 log = logging.getLogger(__name__)
-
-
-def tomatrix(checkins):
-    """Make checkins to a `sparse matrix` object.
-    checkins: {uid: [(iid, freq), ...], ...} or {uid: [uid, ...], ...},
-             see `load_checkins` for detail.
-    usage:
-     >>> import StringIO
-     >>> s = StringIO.StringIO("0 1 2\\n0 2 3\\n2 2 4\\n")
-     >>> cks = load_checkins(s, index=[0,1,2])
-     >>> m = tomatrix(cks)
-     >>> print ("%s" % m).replace("\\t", " ")
-       (0, 1) 2
-       (0, 2) 3
-       (2, 2) 4
-    """
-    row = []
-    col = []
-    data = []
-
-    users = set()
-    items = set()
-    
-    for user in checkins:
-        feedbacks = checkins[user] 
-        for feed in feedbacks:
-            if type(feed) == int:
-                item = feed
-                freq = 1
-            else:
-                item = feed[0]
-                freq = feed[1]
-            row.append(user)
-            col.append(item)
-            data.append(freq)
-
-            items.add(item)
-        
-        users.add(user)
-
-    matrix = sparse.csr_matrix((data, (row, col)), shape=(max(users) + 1, max(items) + 1))
-    return matrix
-
 
 class WMF(Recommender):
     def __init__(self, checkins, num_factors=10, num_iterations=30,

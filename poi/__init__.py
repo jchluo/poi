@@ -19,10 +19,11 @@ from .bpr import BPR
 from .userbase import UserBase
 from .kde import distance 
 from .powerlaw import PowerLaw
+from .pd import PD
 #eval
-from .models import Evaluation
+from .models import Evaluation, assess
+from .cache import dump, load
 
-# Set default logging handler to avoid "No handler found" warnings.
 import logging
 try:  # Python 2.7+
     from logging import NullHandler

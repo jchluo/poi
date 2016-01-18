@@ -2,6 +2,7 @@
 
 import time
 import logging
+
 import numpy as np
 
 from .loader import format_checkins
@@ -12,11 +13,16 @@ log = logging.getLogger(__name__)
 __all__ = ["Recommender", "Evaluation"]
 
 class Recommender(object):
-    def __init__(self, checkins):
+    """Recommender Base class.
+    """
+    def __init__(self, checkins=None):
         super(Recommender, self).__init__()
-        self.checkins = checkins
-        result = format_checkins(checkins) 
-        self.num_users, self.num_items, self.checkins = result 
+        if checkins is not None:
+            self.checkins = checkins
+            result = format_checkins(checkins) 
+            self.num_users, self.num_items, self.checkins = result 
+        else:
+            self.checkins = {} 
 
     def train(self, before=None, after=None):
         raise NotImplementedError
@@ -25,24 +31,20 @@ class Recommender(object):
         raise NotImplementedError
 
     def recommend(self, user, num=5, ruleout=True):
-        scores = []
-        for poi in xrange(self.num_items):
-            scores.append((poi, self.predict(user, poi)))
-        scores.sort(key=lambda x: x[1], reverse=True)
-
         if user in self.checkins and ruleout:
             ruleouts = set(self.checkins[user].keys())
         else:
             ruleouts = set()
 
-        result = []
-        for poi, score in scores:
+        scores = []
+        for poi in xrange(self.num_items):
             if poi in ruleouts:
                 continue
-            result.append(poi)
-            if len(result) >= num:
-                break
-        return result 
+            scores.append((poi, self.predict(user, poi)))
+
+        scores.sort(key=lambda x: x[1], reverse=True)
+
+        return [poi for poi, s in scores[: num]] 
 
         
 def _proxy_test(args):
@@ -100,8 +102,9 @@ class Evaluation(object):
                 (self.topN, self.precision, self.recall)
 
     def hits(self, user):
-        if user in self.checkins:
-            pois = set(self.checkins[user].keys())
+        if user not in self.checkins:
+            return []
+        pois = set(self.checkins[user].keys())
         if len(pois) <= 0:
             return []
         result = self.model.recommend(user, self.topN)
@@ -120,16 +123,12 @@ class Evaluation(object):
             self.full = full
         
         t0 = time.time()
-        def prepare():
-            for user in self.users:
-                yield (self, user, self.full)
 
+        args = [(self, i, self.full) for i in self.users]
         if self._pool_num > 0:
-            matchs = threads(_proxy_test, prepare(), num=self._pool_num)
+            matchs = threads(_proxy_test, args, num=self._pool_num)
         else:
-            matchs = []
-            for arg in prepare():
-                matchs.append(_proxy_test(arg))
+            matchs = [_proxy_test(arg) for arg in args]
         
         nhits = sum([n for u, n in matchs])
         reca = 0.0
@@ -157,3 +156,8 @@ class Evaluation(object):
 
         return (reca, prec)
 
+
+def assess(model, checkins, topN=None, users=None, full=None, num_pool=4):
+    eva = Evaluation(checkins, model=model, _pool_num=num_pool)
+    eva.assess(topN=topN, users=users, full=full)
+    return eva

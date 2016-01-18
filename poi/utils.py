@@ -5,7 +5,10 @@ import random
 from multiprocessing import Pool 
 
 import numpy as np
-import scipy.sparse as sparse
+try:
+    import scipy.sparse as sparse
+except:
+    pass
 
 log = logging.getLogger(__name__)
 
