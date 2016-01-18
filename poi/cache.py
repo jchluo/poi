@@ -52,6 +52,8 @@ class CacheRecommender(Recommender):
         self._meta = {}
 
     def __getattr__(self, attr):
+        if attr == "_meta":
+            raise AttributeError()
         if attr in self._meta:
             return self._meta[attr]
         raise AttributeError("attribute: %s Not Found." % attr)
