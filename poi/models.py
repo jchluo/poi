@@ -98,7 +98,7 @@ class Evaluation(object):
             self.users = users
 
     def __repr__(self):
-        return "<Evaluation [topN=%i, precision=%.4f, recall=%.4f]>" %\
+        return "<Eval [N=%i, prec=%.4f, reca=%.4f]>" %\
                 (self.topN, self.precision, self.recall)
 
     def hits(self, user):

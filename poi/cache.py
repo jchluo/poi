@@ -35,6 +35,7 @@ import time
 import json
 import logging
 
+import numpy as np
 from .utils import threads
 from .models import Recommender
 
@@ -62,7 +63,7 @@ class CacheRecommender(Recommender):
         return "<Cache %s>" % self._meta["__repr__"][1: -1]
 
     def predict(self, user, item):
-        return self._data.get(user, {}).get(item, 0.0)
+        return self._data.get(user, {}).get(item, -np.Infinity)
 
 
 def _proxy_predict(arg):
@@ -73,7 +74,7 @@ def _proxy_predict(arg):
     return [i, scores[: num]]
 
 
-def dump(model, fp, num=100, attrs=None, _pool_num=4):
+def dump(model, fp, num=1000, attrs=None, _pool_num=4):
     """Dump predict record to file.
         fp: file pointer like object, 
         num: top num item and its score will be stored,
