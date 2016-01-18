@@ -50,8 +50,8 @@ class BPR(Recommender):
                             size=(self.num_items, self.num_factors))
 
     def __repr__(self):
-        return "<BPR [k=%i, learn=%.2f, reg_u=%.2f, reg_i=%.2f]>"\
-            (self.learn_rate, self.reg_user, self.reg_item)
+        return "<BPR [k=%i, learn=%.2f, reg_u=%.2f, reg_i=%.2f]>" %\
+            (self.num_factors, self.learn_rate, self.reg_user, self.reg_item)
 
     def create_samples(self, size):
         samples = []
