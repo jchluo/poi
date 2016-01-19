@@ -20,7 +20,7 @@
     >>> from StringIO import StringIO
     >>> f = StringIO()
     >>> md = M()
-    >>> dump(md, f, attrs=["name"], _pool_num=0)
+    >>> dump(md, f, attrs=["name"], num_pool=0)
 
     usage load
     >>> f.seek(0) 
@@ -63,7 +63,7 @@ class CacheRecommender(Recommender):
         return "<Cache %s>" % self._meta["__repr__"][1: -1]
 
     def predict(self, user, item):
-        return self._data.get(user, {}).get(item, -np.Infinity)
+        return self._data.get(user, {}).get(item, -10 * 10)
 
 
 def _proxy_predict(arg):
@@ -74,22 +74,22 @@ def _proxy_predict(arg):
     return [i, scores[: num]]
 
 
-def dump(model, fp, num=1000, attrs=None, _pool_num=4):
+def dump(model, fp, num=1000, attrs=None, num_pool=4):
     """Dump predict record to file.
         fp: file pointer like object, 
         num: top num item and its score will be stored,
             other item will be abandoned.
         attrs: list like, the attributes want to be stored,
                 num_items and num_users will auto stored.
-        _pool_num: number of threads, 0 will turn off multiple threads.
+        num_pool: number of threads, 0 will turn off multiple threads.
     """
     if model is None:
         raise ValueError("model is None.") 
 
     t0 = time.time()
     args = [(model, i, num) for i in xrange(model.num_users)]
-    if _pool_num > 0:
-        results = threads(_proxy_predict, args, _pool_num)
+    if num_pool > 0:
+        results = threads(_proxy_predict, args, num_pool)
     else:
         results = [_proxy_predict(arg) for arg in args]
 
@@ -113,7 +113,7 @@ def dump(model, fp, num=1000, attrs=None, _pool_num=4):
         print >> fp, json.dumps(one)
 
     t1 = time.time()
-    log.debug("dump ok, time: %.2f" % (t1 - t0))
+    log.debug("dump ok, time: %.2fs" % (t1 - t0))
 
 
 def load(fp):

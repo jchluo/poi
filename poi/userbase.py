@@ -33,21 +33,29 @@ def similarity(di, dj):
 class SSMatrix(object):
     """Symmetry Sparse Matrix.
     usage:
-     >>> m = SSMatrix(3, 3)
+     >>> m = SSMatrix(3)
      >>> m[0, 0] = 1 
      >>> m[0, 1] = 2
      >>> print m[1, 0], m[0, 0], m[1, 1]
      2 1 0.0
-     >>> print m.items(1)
-     [(0, 2), (1, 0.0), (2, 0.0)]
+     >>> print m[1].items(), m[2].items()
+     [(0, 2)] []
+     >>> m[1, 1] = 4.0
+     >>> print m[1].items()
+     [(0, 2), (1, 4.0)]
     """
-    def __init__(self, num_row, num_col):
+    def __init__(self, num):
         self._data = {}
-        self.num_row = num_row
-        self.num_col = num_col
+        self.num = num
 
-    def __getitem__(self, key):
-        row, col = key
+    def _get_entity(self, row, col):
+        """Get an entity.
+        """
+        if row >= self.num:
+            raise ValueError("out of row boundary.")
+        if col >= self.num:
+            raise ValueError("out of col boundary.")
+
         if row in self._data:
             if col in self._data[row]:
                 return self._data[row][col]
@@ -57,24 +65,41 @@ class SSMatrix(object):
                 return self._data[col][row]
         return 0.0
 
+    def __getitem__(self, key):
+        """Return a row or an entity.
+        """
+        # a row data
+        if type(key) == int:
+            row = key
+            if row in self._data:
+                entitys = self._data[row] 
+            else:
+                entitys = {} 
+            for r in xrange(row + 1, self.num):
+                en = self._get_entity(r, row)
+                if en != 0.0:
+                    entitys[r] = en 
+            return entitys
+        elif type(key) == tuple:
+            return self._get_entity(*key)
+        else:
+            raise KeyError("key: %s error." % key)
+
     def __setitem__(self, key, val):
         if val == 0.0:
             return None
         row, col = key
-        if row >= self.num_row:
+        if row >= self.num:
             raise ValueError("out of row boundary.")
-        if col >= self.num_col:
+        if col >= self.num:
             raise ValueError("out of col boundary.")
+
+        if row < col:
+            row, col = col, row
         if row not in self._data:
             self._data[row] = {col : val}
         else:
             self._data[row][col] = val
-
-    def items(self, row):
-        l = []
-        for i in xrange(self.num_col):
-            l.append((i, self.__getitem__((row, i))))
-        return l
 
 
 class UserBase(Recommender):
@@ -87,14 +112,14 @@ class UserBase(Recommender):
         >>> ub.recommend(0, 1) #recommend 1 item for user 0
         [0]
     """
-    def __init__(self, checkins, num_neighbor=10):
+    def __init__(self, checkins, num_neighbors=10):
         super(UserBase, self).__init__(checkins);
-        self.num_neighbor = num_neighbor
+        self.num_neighbors = num_neighbors
         self._neighbors = None 
-        self.between = SSMatrix(self.num_items, self.num_items) 
+        self.between = SSMatrix(self.num_items) 
 
     def __repr__(self):
-        return "<UserBase [K=%i]>" % self.num_neighbor
+        return "<UserBase [K=%i]>" % self.num_neighbors
 
     def similarity(self):
         t0 = time.time()
@@ -108,18 +133,18 @@ class UserBase(Recommender):
                 log.debug("similarity user: %i(%.f%%) time: %.2fs" % \
                         (ui, ui * 100.0 / self.num_users, t1 - t0))
 
-    def neighbors(self, num_neighbor=None):
+    def neighbors(self, num_neighbors=None):
         t1  = time.time()
-        if num_neighbor is not None:
-            self.num_neighbor = num_neighbor
+        if num_neighbors is not None:
+            self.num_neighbors = num_neighbors
 
         self._neighbors = {}
         for u in xrange(self.num_users):
-            friends = self.between.items(u) 
+            friends = self.between[u].items()
             friends.sort(key=lambda x: x[1], reverse=True)
-            self._neighbors[u] = [f for f, s in friends[: self.num_neighbor]]
+            self._neighbors[u] = [f for f, s in friends[: self.num_neighbors]]
         t2  = time.time()
-        log.debug("neighbors N: %i time: %.2fs" % (self.num_neighbor, t2 - t1))
+        log.debug("neighbors N: %i time: %.2fs" % (self.num_neighbors, t2 - t1))
 
     def predict(self, user, item):
         if self._neighbors is None:
